@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# pytest / debug temp dirs
+pytest-of-*/
+tmp*/
+
+
+# Node
+node_modules/
+frontend/dist/
+
+# Runtime data
+data/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+# local env
+.env
+
+out*/
+
+# pip build leftovers
+pip-*/

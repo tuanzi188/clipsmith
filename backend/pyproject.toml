@@ -1,0 +1,35 @@
+[project]
+name = "clipsmith"
+version = "0.1.0"
+description = "Transcript-first AI clipping: transcribe, select, cut, and export editable clips."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "python-multipart>=0.0.9",
+    "openai>=1.40",
+]
+
+[project.optional-dependencies]
+# Local ASR. Heavy: pulls torch, funasr, modelscope.
+asr = ["funasr>=1.2", "modelscope>=1.20", "librosa>=0.10", "soundfile>=0.12"]
+# Light local ASR: CTranslate2 int8, no torch at runtime.
+whisper = ["faster-whisper>=1.0"]
+draft = ["pyJianYingDraft>=0.2"]
+
+[project.scripts]
+clipsmith = "clipsmith.cli:main"
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["clipsmith*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
