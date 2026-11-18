@@ -1,0 +1,20 @@
+ClipSmith
+=========
+
+This project is an independent reimplementation built with ideas from:
+
+  FunClip — https://github.com/modelscope/FunClip
+  Copyright FunASR (https://github.com/alibaba-damo-academy/FunClip)
+  Licensed under the MIT License.
+
+Specifically, `backend/clipsmith/engine/funclip.py` adapts the recognition
+entry point `VideoClipper.recog`, and the sentence/timestamp normalisation
+follows the behaviour of FunClip's `videoclipper.py`. The web UI, job model,
+selection strategies, rendering and export paths are original to ClipSmith.
+
+Optional runtime dependencies keep their own licenses:
+
+  FunASR   — MIT        https://github.com/modelscope/FunASR
+  ffmpeg   — LGPL/GPL   https://ffmpeg.org/legal.html
+
+ClipSmith itself is MIT licensed; see LICENSE.
