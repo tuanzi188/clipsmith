@@ -7,6 +7,7 @@ interface Props {
   videoRef: RefObject<HTMLVideoElement | null>;
   currentTime: number;
   onTimeUpdate: (time: number) => void;
+  onLoadedMetadata?: () => void;
   filename: string;
   duration?: number | null;
 }
@@ -16,6 +17,7 @@ export function VideoStage({
   videoRef,
   currentTime,
   onTimeUpdate,
+  onLoadedMetadata,
   filename,
   duration,
 }: Props) {
@@ -34,6 +36,7 @@ export function VideoStage({
           playsInline
           onTimeUpdate={(event) => onTimeUpdate(event.currentTarget.currentTime)}
           onSeeked={(event) => onTimeUpdate(event.currentTarget.currentTime)}
+          onLoadedMetadata={() => onLoadedMetadata?.()}
         />
       </div>
       <div className="stage-meta">

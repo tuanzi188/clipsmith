@@ -107,14 +107,21 @@ export default function App() {
   }, [mode, tabs.ids.length]);
 
   // -- tab operations -----------------------------------------------------
-  const openJob = useCallback((jobId: string) => {
-    setTabs((current) => {
-      if (current.ids.includes(jobId)) return { ...current, active: jobId };
-      if (current.ids.length >= MAX_TABS) return current;
-      return { ids: [jobId, ...current.ids], active: jobId };
-    });
-    setMode("tabs");
-  }, []);
+  const openJob = useCallback(
+    (jobId: string) => {
+      setError(null);
+      if (!tabs.ids.includes(jobId) && tabs.ids.length >= MAX_TABS) {
+        setError(`最多同时打开 ${MAX_TABS} 个项目，请先关闭一个标签再试`);
+        return;
+      }
+      setTabs((current) => {
+        if (current.ids.includes(jobId)) return { ...current, active: jobId };
+        return { ids: [jobId, ...current.ids], active: jobId };
+      });
+      setMode("tabs");
+    },
+    [tabs.ids],
+  );
 
   const closeTab = useCallback((jobId: string) => {
     setTabs((current) => {

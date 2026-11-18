@@ -48,12 +48,14 @@ export function Workspace({ jobId, health, visible, setup, onMeta, onClose }: Pr
   const searchRef = useRef<HTMLInputElement>(null);
   const autoStarted = useRef<string | null>(null);
   const autoChat = useRef<string | null>(null);
+  const pendingSeek = useRef<number | null>(null);
 
   // -- load / live updates ------------------------------------------------
   useEffect(() => {
     setJob(null);
     setLoadError(null);
     autoStarted.current = null;
+    pendingSeek.current = null;
     api
       .getJob(jobId)
       .then((value) => {
@@ -63,13 +65,46 @@ export function Workspace({ jobId, health, visible, setup, onMeta, onClose }: Pr
       .catch((err) => setLoadError(errorMessage(err)));
   }, [jobId]);
 
+  // Only the visible tab holds an EventSource: browsers cap ~6 connections per
+  // origin, so one SSE per tab (hidden ones included) starves fetches and
+  // media requests. Hidden tabs fall back to the busy poller below.
   useEffect(() => {
-    if (!job?.id) return;
-    return subscribe(job.id, (value) => {
-      setJob(value);
-      onMeta(value);
-    });
-  }, [job?.id]);
+    if (!job?.id || !visible) return;
+    return subscribe(
+      job.id,
+      (value) => {
+        setJob(value);
+        onMeta(value);
+      },
+      () => {
+        // Stream dropped: pull one fresh snapshot. The stream re-connects on
+        // its own and replays the current state when it does.
+        api
+          .getJob(job.id)
+          .then((value) => {
+            setJob(value);
+            onMeta(value);
+          })
+          .catch(() => undefined);
+      },
+    );
+  }, [job?.id, visible]);
+
+  // A tab that just came back from the background has been tracking busy
+  // states through polling only; fetch one snapshot so nothing looks stale.
+  const prevVisible = useRef(visible);
+  useEffect(() => {
+    if (visible && !prevVisible.current && job?.id) {
+      api
+        .getJob(job.id)
+        .then((value) => {
+          setJob(value);
+          onMeta(value);
+        })
+        .catch(() => undefined);
+    }
+    prevVisible.current = visible;
+  }, [visible, job?.id]);
 
   useEffect(() => {
     if (!job?.id || !BUSY.includes(job.status)) return;
@@ -110,6 +145,9 @@ export function Workspace({ jobId, health, visible, setup, onMeta, onClose }: Pr
   const subtitles = job?.export_subtitles ?? false;
   const trimSilence = job?.trim_silence ?? true;
 
+  // Serialize option PATCHes: responses apply in request order, so a fast
+  // stale response can never overwrite a newer choice made right after it.
+  const optionsChain = useRef<Promise<void>>(Promise.resolve());
   const updateOptions = (patch: {
     aspect?: Aspect;
     fit?: AspectFit;
@@ -118,10 +156,11 @@ export function Workspace({ jobId, health, visible, setup, onMeta, onClose }: Pr
     quality?: RenderQuality;
   }) => {
     if (!job) return;
+    const jobId = job.id;
     setError(null);
-    api
-      .setOptions(job.id, patch)
-      .then((value) => {
+    optionsChain.current = optionsChain.current
+      .then(async () => {
+        const value = await api.setOptions(jobId, patch);
         setJob(value);
         onMeta(value);
       })
@@ -195,9 +234,26 @@ export function Workspace({ jobId, health, visible, setup, onMeta, onClose }: Pr
   const seek = useCallback((seconds: number) => {
     const video = videoRef.current;
     if (!video) return;
-    video.currentTime = seconds;
+    // The transcript can render before the media metadata arrives; assigning
+    // currentTime before that throws. Park the seek until the first frame.
+    if (video.readyState < 1) {
+      pendingSeek.current = seconds;
+      return;
+    }
+    try {
+      video.currentTime = seconds;
+    } catch {
+      return;
+    }
     void video.play().catch(() => undefined);
   }, []);
+
+  const flushPendingSeek = useCallback(() => {
+    const target = pendingSeek.current;
+    if (target === null) return;
+    pendingSeek.current = null;
+    seek(target);
+  }, [seek]);
 
   // -- keyboard shortcuts --------------------------------------------------
   useEffect(() => {
@@ -379,6 +435,7 @@ export function Workspace({ jobId, health, visible, setup, onMeta, onClose }: Pr
             videoRef={videoRef}
             currentTime={time}
             onTimeUpdate={setTime}
+            onLoadedMetadata={flushPendingSeek}
             filename={job.filename}
             duration={job.duration}
           />
