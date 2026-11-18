@@ -88,6 +88,17 @@ def test_upload_rejects_unknown_type(tmp_path: Path) -> None:
         assert response.status_code == 400
 
 
+def test_upload_rejects_corrupt_media_with_400(tmp_path: Path) -> None:
+    settings = Settings(data_dir=tmp_path / "data", engine="mock")
+    settings.frontend_dist = tmp_path / "no-dist"
+    with TestClient(create_app(settings)) as client:
+        response = client.post(
+            "/api/jobs", files={"file": ("broken.mp4", b"not a real mp4", "video/mp4")}
+        )
+        assert response.status_code == 400
+        assert "无法解析" in response.text
+
+
 def test_plan_requires_transcript(tmp_path: Path) -> None:
     settings = Settings(data_dir=tmp_path / "data", engine="mock")
     settings.frontend_dist = tmp_path / "no-dist"

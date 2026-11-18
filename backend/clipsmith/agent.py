@@ -140,7 +140,7 @@ _TOOL_SPECS: list[dict] = [
         "type": "function",
         "function": {
             "name": "select_clips",
-            "description": "用句子 id 区间设置候选片段（会替换现有片段）。只能使用转写稿里真实存在的句子 id。",
+            "description": "用句子 id 区间设置候选片段（会替换现有片段）。只能使用转写稿里真实存在的句子 id，最多 12 个片段。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -334,11 +334,18 @@ class ClipAgent:
         if not reply:
             reply = "这轮先停在这里，你可以继续说下一步要改什么。"
 
-        append_chat(self.store, self.job_id, "assistant", reply, actions)
-        job = self.store.load(self.job_id)
-        job.chat_pending = False
-        self.store.save(job)
-        await self.publish(job)
+        try:
+            append_chat(self.store, self.job_id, "assistant", reply, actions)
+        finally:
+            # chat_pending must be cleared even if persistence blows up, or the
+            # job is stuck on "上一条指令还在执行" forever.
+            try:
+                job = self.store.load(self.job_id)
+                job.chat_pending = False
+                self.store.save(job)
+                await self.publish(job)
+            except Exception:  # noqa: BLE001 - nothing left to recover onto
+                pass
 
     # -- LLM ---------------------------------------------------------------
     def _call_llm(self, messages: list[dict]) -> Any:

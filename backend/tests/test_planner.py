@@ -3,7 +3,13 @@ from __future__ import annotations
 import pytest
 
 from clipsmith.models import Sentence, Transcript
-from clipsmith.planner import PlanOptions, clips_from_sentences, plan
+from clipsmith.planner import (
+    MAX_AGENT_CLIPS,
+    PlanOptions,
+    clips_from_sentences,
+    clips_from_specs,
+    plan,
+)
 
 
 def make_transcript(count: int = 12, step: float = 3.0) -> Transcript:
@@ -50,6 +56,28 @@ def test_manual_selection_splits_into_runs() -> None:
 def test_manual_selection_ignores_unknown_ids() -> None:
     transcript = make_transcript()
     assert clips_from_sentences(transcript, [99, 100], PlanOptions()) == []
+
+
+def test_specs_with_bad_score_fall_back_instead_of_failing() -> None:
+    transcript = make_transcript(6, 3.0)
+    clips = clips_from_specs(
+        transcript,
+        [
+            {"from_sentence": 0, "to_sentence": 1, "score": "很高"},
+            {"from_sentence": 3, "to_sentence": 4, "score": None},
+        ],
+        PlanOptions(mode="manual"),
+    )
+    assert len(clips) == 2
+    assert clips[0].score == 0.5
+    assert clips[1].score == 0.7
+
+
+def test_specs_are_hard_capped() -> None:
+    transcript = make_transcript(60, 3.0)
+    specs = [{"from_sentence": i, "to_sentence": i} for i in range(0, 60, 2)]
+    clips = clips_from_specs(transcript, specs, PlanOptions(mode="manual"))
+    assert len(clips) == MAX_AGENT_CLIPS
 
 
 def test_llm_without_key_falls_back_to_rules() -> None:

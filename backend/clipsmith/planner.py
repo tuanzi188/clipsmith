@@ -25,6 +25,11 @@ from .models import Clip, Sentence, Transcript
 
 PlanMode = Literal["rules", "llm"]
 
+# Hard ceiling for agent-supplied ranges. The system prompt asks for at most 6,
+# but the prompt is a soft guide — this is the enforced bound, so one runaway
+# tool call can never queue an unbounded serial render batch.
+MAX_AGENT_CLIPS = 12
+
 _KEYWORDS = (
     "结论", "其实", "建议", "为什么", "怎么", "第一", "记住", "免费", "错误",
     "方法", "提升", "测试", "数据", "关键", "本质", "核心", "但是", "所以",
@@ -122,11 +127,13 @@ def clips_from_specs(
     """Build clips from explicit sentence ranges supplied by the agent.
 
     The agent never talks in timestamps; it only picks sentence ids, which are
-    validated here before any media is touched.
+    validated here before any media is touched. At most MAX_AGENT_CLIPS ranges
+    are accepted, and a spec with unparseable fields is skipped instead of
+    failing the whole selection.
     """
     by_id = {sentence.id: sentence for sentence in transcript.sentences}
     clips: list[Clip] = []
-    for spec in specs:
+    for spec in specs[:MAX_AGENT_CLIPS]:
         if not isinstance(spec, dict):
             continue
         try:
@@ -143,6 +150,10 @@ def clips_from_specs(
         start, end = sentences[0].start, sentences[-1].end
         if end - start < 1.0:
             continue
+        try:
+            score = _clamp(float(spec.get("score", 0.7) or 0.7))
+        except (TypeError, ValueError):
+            score = 0.5
         hook = str(spec.get("hook") or _hook(sentences[0].text))[:60]
         clips.append(
             Clip(
@@ -154,7 +165,7 @@ def clips_from_specs(
                 title=str(spec.get("title") or hook)[:40],
                 caption=str(spec.get("caption") or "")[:120],
                 tags=_clean_tags(spec.get("tags")),
-                score=_clamp(float(spec.get("score", 0.7) or 0.7)),
+                score=score,
                 reason=str(spec.get("reason") or "AI 选段")[:200],
             )
         )

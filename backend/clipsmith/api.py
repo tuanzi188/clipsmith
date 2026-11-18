@@ -170,6 +170,9 @@ def create_app(config: Settings | None = None) -> FastAPI:
             job.has_audio = info.has_audio
             job.message = f"{info.duration:.0f}s · {written / 1024 / 1024:.1f} MB"
             store.save(job)
+        except MediaError as exc:
+            shutil.rmtree(store.job_dir(job.id), ignore_errors=True)
+            raise HTTPException(400, f"文件无法解析：{exc}") from exc
         except Exception:
             shutil.rmtree(store.job_dir(job.id), ignore_errors=True)
             raise
