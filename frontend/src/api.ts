@@ -84,11 +84,6 @@ export const api = {
       }),
     ),
   deleteJob: (id: string) => request<{ deleted: string }>(`/jobs/${id}`, { method: "DELETE" }),
-  voiceover: (id: string, clipId: string, text: string, voice?: string) =>
-    request<{ narration_seconds: number; tempo: number; trimmed: boolean; job: Job }>(
-      `/jobs/${id}/clips/${clipId}/voiceover`,
-      json({ text, ...(voice ? { voice } : {}) }),
-    ),
   getChat: (id: string) => request<ChatState>(`/jobs/${id}/chat`),
   sendChat: (id: string, message: string, options?: ExportPatch) =>
     request<{ pending: boolean }>(

@@ -1,5 +1,7 @@
 # ClipSmith
 
+[![CI](https://github.com/tuanzi188/clipsmith/actions/workflows/ci.yml/badge.svg)](https://github.com/tuanzi188/clipsmith/actions/workflows/ci.yml)
+
 **转写稿优先的 AI 剪辑台。** 上传素材 → 得到逐句转写稿 → 点句子选段（或让模型选）→ 切出片段。
 
 不是又一个"输入关键词，切一段视频"的工具：交互、选段策略、渲染层都是独立模块，方便继续迭代。
