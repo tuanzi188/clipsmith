@@ -25,9 +25,10 @@ from .models import Clip, Sentence, Transcript
 
 PlanMode = Literal["rules", "llm"]
 
-# Hard ceiling for agent-supplied ranges. The system prompt asks for at most 6,
-# but the prompt is a soft guide — this is the enforced bound, so one runaway
-# tool call can never queue an unbounded serial render batch.
+# Hard ceiling for agent-supplied ranges. The system prompt asks for 3–6, but
+# that is a soft guide — this is the enforced bound, so one runaway tool call
+# can never queue an unbounded serial render batch. Keep it looser than the
+# prompt so a slightly over-eager model is trimmed rather than silently obeyed.
 MAX_AGENT_CLIPS = 12
 
 _KEYWORDS = (

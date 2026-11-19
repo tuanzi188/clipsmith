@@ -82,6 +82,11 @@ export function ClipTray({ job, disabled, onRender, onSeek, draftUrl }: Props) {
             )}
             {clip.caption && <p className="clip-caption">{clip.caption}</p>}
             <p className="clip-reason">{clip.reason}</p>
+            {clip.voiceover_text && (
+              <p className="clip-voiceover" title={clip.voiceover_text}>
+                旁白 · {clip.voiceover_text}
+              </p>
+            )}
             {clip.tags.length > 0 && (
               <div className="tags">
                 {clip.tags.map((tag) => (

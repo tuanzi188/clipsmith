@@ -59,6 +59,17 @@ class JobStore:
             raise ValueError(f"invalid clip id: {clip_id!r}")
         return self.clips_dir(job_id) / f"{clip_id}.mp4"
 
+    def base_clip_path(self, job_id: str, clip_id: str) -> Path:
+        """Narration-free render kept alongside a mixed clip.
+
+        Voiceover is layered on top of this base instead of the already-mixed
+        file, so re-recording narration replaces the old one instead of
+        stacking a second track under the first.
+        """
+        if not _JOB_ID_RE.match(clip_id):
+            raise ValueError(f"invalid clip id: {clip_id!r}")
+        return self.clips_dir(job_id) / f"{clip_id}.base.mp4"
+
     # -- lifecycle ---------------------------------------------------------
     def create(self, filename: str) -> Job:
         job_id = f"{uuid.uuid4().hex[:8]}"
@@ -99,6 +110,7 @@ class JobStore:
         if not directory.exists():
             return
         keep = {f"{clip.id}.mp4" for clip in job.clips}
+        keep |= {f"{clip.id}.base.mp4" for clip in job.clips}
         for path in directory.glob("*.mp4"):
             if path.name not in keep:
                 path.unlink(missing_ok=True)

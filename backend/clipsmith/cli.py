@@ -102,7 +102,9 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument("input")
     run_parser.add_argument("-o", "--output", default="out")
     run_parser.add_argument(
-        "--engine", default="mock", choices=["mock", "whisper", "funasr", "funclip"]
+        "--engine",
+        default="mock",
+        choices=["mock", "whisper", "openai-asr", "funasr", "funclip"],
     )
     run_parser.add_argument("--mode", default="rules", choices=["rules", "llm"])
     run_parser.add_argument("--limit", type=int, default=5)

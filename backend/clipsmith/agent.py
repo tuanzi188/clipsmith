@@ -29,6 +29,7 @@ from .planner import (
     clips_from_specs,
 )
 from .render import render_selected
+from .voiceover import VOICES, add_voiceover_to_clip
 
 MAX_STEPS = 10
 MAX_HISTORY = 12
@@ -140,7 +141,7 @@ _TOOL_SPECS: list[dict] = [
         "type": "function",
         "function": {
             "name": "select_clips",
-            "description": "用句子 id 区间设置候选片段（会替换现有片段）。只能使用转写稿里真实存在的句子 id，最多 12 个片段。",
+            "description": "用句子 id 区间设置候选片段（会替换现有片段）。只能使用转写稿里真实存在的句子 id。按吸引力排序，通常 3~6 个；后端硬上限 12 个，超出会被截断。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -208,6 +209,33 @@ _TOOL_SPECS: list[dict] = [
     {
         "type": "function",
         "function": {
+            "name": "add_voiceover",
+            "description": (
+                "给已导出的片段加一条独立旁白：旁白叠在原声上，原声自动压低，"
+                "不替换原声。用户要求配解说/旁白/串词时调用。文案要自己先写好，"
+                "中文 1-2 句、不超过 80 字。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "clip_id": {"type": "string"},
+                    "text": {
+                        "type": "string",
+                        "description": "旁白文案，中文 1-2 句，不超过 80 字",
+                    },
+                    "voice": {
+                        "type": "string",
+                        "enum": VOICES,
+                        "description": "音色，默认女声 Xiaoxiao",
+                    },
+                },
+                "required": ["clip_id", "text"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "delete_clips",
             "description": "删除片段。属于破坏性操作，仅在用户明确要求时调用。",
             "parameters": {
@@ -249,6 +277,7 @@ _SYSTEM = """你是 ClipSmith 的 AI 剪辑导演，正在一个本地剪辑工�
 8. 每轮最多调用 4 个工具；不要一次做完所有事，必要时分步。
 9. 回复用中文，简短说明：做了什么 → 片段清单（标题 + 时长）→ 一句下一步建议。不要输出 JSON、代码块或工具名列表。
 10. 不要声称做了没有通过工具真正执行的事。
+11. 用户要旁白/解说/串词时：自己写 1–2 句中文（不超过 80 字），片段必须已经导出了，再调用 add_voiceover。旁白叠在原声上、原声会被压低，不会替换原声，回复里要说清楚这一点。
 """
 
 
@@ -639,6 +668,9 @@ class ClipAgent:
             clip.status = "planned"
             clip.removed_pauses = 0
             clip.removed_seconds = 0.0
+            # The old render and its narration no longer match the new range.
+            self.store.base_clip_path(job.id, clip.id).unlink(missing_ok=True)
+            clip.voiceover_text = ""
 
         if title is not None:
             clip.title = title[:40]
@@ -646,7 +678,6 @@ class ClipAgent:
             clip.caption = caption[:120]
         if tags is not None:
             clip.tags = [str(t).lstrip("#")[:16] for t in tags][:4]
-        clip.status = "planned"
         self.store.save(job)
         return {
             "ok": True,
@@ -694,6 +725,39 @@ class ClipAgent:
             "summary": f"导出完成 {len(ready)}/{len(done)} 个片段"
             + ("（已烧字幕）" if job.export_subtitles else "")
             + f"，画质 {job.render_quality}",
+        }
+
+    def _tool_add_voiceover(
+        self,
+        clip_id: str,
+        text: str,
+        voice: str | None = None,
+    ) -> dict:
+        job = self.job
+        clip = next((item for item in job.clips if item.id == clip_id), None)
+        if clip is None:
+            return {"ok": False, "error": f"找不到片段 {clip_id}"}
+        if clip.status != "ready" or not clip.file:
+            return {"ok": False, "error": "这个片段还没有导出，先调用 render_clips"}
+        if not text.strip():
+            return {"ok": False, "error": "旁白文案不能为空"}
+        if voice and voice not in VOICES:
+            return {"ok": False, "error": f"不支持的音色：{voice}"}
+        try:
+            result = add_voiceover_to_clip(
+                self.store, job, clip_id, text.strip()[:200], voice=voice
+            )
+        except Exception as exc:  # noqa: BLE001 - returned to the model
+            return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+        self.job = self.store.load(self.job_id)
+        return {
+            "ok": True,
+            "clip_id": clip_id,
+            **result,
+            "summary": (
+                f"已给「{clip.title or clip.hook}」加旁白"
+                f"（{text.strip()[:24]}…），原声压低、未替换"
+            ),
         }
 
     def _tool_delete_clips(self, clip_ids: list[str]) -> dict:

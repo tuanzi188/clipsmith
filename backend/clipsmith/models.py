@@ -70,6 +70,7 @@ class Clip:
     ranges: list[list[float]] = field(default_factory=list)
     removed_pauses: int = 0
     removed_seconds: float = 0.0
+    voiceover_text: str = ""
 
     @property
     def duration(self) -> float:

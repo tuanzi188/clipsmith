@@ -72,6 +72,46 @@ def test_select_and_update_clips_offline(tmp_path: Path) -> None:
     assert updated.end - updated.start == pytest.approx(3.0, abs=0.4)
 
 
+def test_metadata_change_keeps_render_but_range_change_resets_it(
+    tmp_path: Path,
+) -> None:
+    agent, store, job_id = _make_agent(tmp_path)
+    agent._execute(
+        "select_clips",
+        {"clips": [{"from_sentence": 0, "to_sentence": 2}], "trim_silence": False},
+    )
+    clip_id = agent.job.clips[0].id
+
+    job = store.load(job_id)
+    clip = job.clips[0]
+    clip.status = "ready"
+    clip.file = f"clips/{clip.id}.mp4"
+    clip.voiceover_text = "旧旁白"
+    store.save(job)
+    agent.job = store.load(job_id)
+
+    # Renaming must not invalidate the rendered file or its narration.
+    payload, _ = agent._execute(
+        "update_clip", {"clip_id": clip_id, "title": "新标题"}
+    )
+    assert payload["ok"]
+    renamed = next(c for c in store.load(job_id).clips if c.id == clip_id)
+    assert renamed.status == "ready"
+    assert renamed.voiceover_text == "旧旁白"
+    assert renamed.title == "新标题"
+
+    # Changing the sentence range does: the old media no longer matches.
+    agent.job = store.load(job_id)
+    payload, _ = agent._execute(
+        "update_clip", {"clip_id": clip_id, "from_sentence": 1, "to_sentence": 2}
+    )
+    assert payload["ok"]
+    rescoped = next(c for c in store.load(job_id).clips if c.id == clip_id)
+    assert rescoped.status == "planned"
+    assert rescoped.file is None
+    assert rescoped.voiceover_text == ""
+
+
 def test_project_state_and_options(tmp_path: Path) -> None:
     agent, store, job_id = _make_agent(tmp_path)
     state, _ = agent._execute("get_project_state", {})

@@ -10,6 +10,7 @@ import pytest
 
 from clipsmith.media import (
     burn_subtitles,
+    extract_audio,
     normalize_loudness,
     probe,
     render_clip,
@@ -125,3 +126,12 @@ def test_normalize_loudness_hits_platform_target(tmp_path: Path) -> None:
     normalize_loudness(video)
     after = _integrated_loudness(video)
     assert after == pytest.approx(-14.0, abs=1.5)
+
+
+def test_extract_audio_makes_a_small_upload(tmp_path: Path) -> None:
+    video = _make_video(tmp_path / "v.mp4", 3.0)
+    output = tmp_path / "upload.mp3"
+    extract_audio(video, output)
+    assert output.exists()
+    assert output.stat().st_size < video.stat().st_size
+    assert probe(output).duration == pytest.approx(3.0, abs=0.3)

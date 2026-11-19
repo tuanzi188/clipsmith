@@ -39,6 +39,17 @@ def build_engine(settings: Settings) -> Engine:
             compute_type=settings.whisper_compute,
             language=settings.asr_language,
         )
+    if name in ("openai-asr", "cloud"):
+        from .openai_asr import OpenAIASREngine
+
+        return OpenAIASREngine(
+            base_url=settings.cloud_asr_base_url,
+            api_key=settings.cloud_asr_api_key,
+            model=settings.cloud_asr_model,
+            language=settings.cloud_asr_language,
+            timeout=settings.cloud_asr_timeout,
+        )
     raise ValueError(
-        f"unknown engine: {settings.engine!r} (use mock, whisper, funasr or funclip)"
+        f"unknown engine: {settings.engine!r} "
+        "(use mock, whisper, openai-asr, funasr or funclip)"
     )

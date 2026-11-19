@@ -6,9 +6,9 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 
-# pytest / debug temp dirs
+# pytest / debug temp dirs and stray tool output (files or dirs)
 pytest-of-*/
-tmp*/
+tmp*
 
 
 # Node

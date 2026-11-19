@@ -63,6 +63,21 @@ class Settings:
     whisper_model: str = field(default_factory=lambda: _env("CLIPSMITH_WHISPER_MODEL", "small"))
     whisper_device: str = field(default_factory=lambda: _env("CLIPSMITH_WHISPER_DEVICE", "cpu"))
     whisper_compute: str = field(default_factory=lambda: _env("CLIPSMITH_WHISPER_COMPUTE", "int8"))
+    # Cloud ASR: any OpenAI-compatible /v1/audio/transcriptions endpoint that
+    # returns verbose_json segments (Groq, OpenAI, self-hosted whisper).
+    cloud_asr_base_url: str = field(
+        default_factory=lambda: _env("CLIPSMITH_CLOUD_ASR_BASE_URL", "")
+    )
+    cloud_asr_api_key: str = field(
+        default_factory=lambda: _env("CLIPSMITH_CLOUD_ASR_API_KEY", "")
+    )
+    cloud_asr_model: str = field(default_factory=lambda: _env("CLIPSMITH_CLOUD_ASR_MODEL", ""))
+    cloud_asr_language: str = field(
+        default_factory=lambda: _env("CLIPSMITH_CLOUD_ASR_LANG", "zh")
+    )
+    cloud_asr_timeout: float = field(
+        default_factory=lambda: float(_env("CLIPSMITH_CLOUD_ASR_TIMEOUT", "180"))
+    )
     # Optional path to a FunClip checkout; only used by the "funclip" engine.
     funclip_path: str = field(default_factory=lambda: _env("CLIPSMITH_FUNCLIP_PATH", "vendor/FunClip"))
 

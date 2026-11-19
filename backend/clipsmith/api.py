@@ -26,6 +26,7 @@ from .models import Job
 from .planner import LLMConfig, PlanOptions, apply_silence_trim, clips_from_sentences, plan
 from .render import render_selected
 from .subtitles import clip_srt, to_srt
+from .voiceover import add_voiceover_to_clip
 
 ALLOWED_SUFFIXES = {
     ".mp4", ".mov", ".mkv", ".webm", ".m4v", ".avi",
@@ -69,6 +70,11 @@ class ChatRequest(BaseModel):
     subtitles: bool | None = None
     trim_silence: bool | None = None
     quality: Literal["draft", "standard", "final"] | None = None
+
+
+class VoiceoverRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=500)
+    voice: str | None = None
 
 
 def _repair_filename(name: str) -> str:
@@ -401,6 +407,35 @@ def create_app(config: Settings | None = None) -> FastAPI:
         finally:
             app.state.busy.pop(job_id, None)
             await publish(store.load(job_id))
+
+    # -- voiceover ---------------------------------------------------------
+    @app.post("/api/jobs/{job_id}/clips/{clip_id}/voiceover")
+    async def clip_voiceover(
+        job_id: str, clip_id: str, request: VoiceoverRequest
+    ) -> dict:
+        job = load_job(job_id)
+        if job.chat_pending:
+            raise HTTPException(409, "AI 正在执行对话操作")
+        if not claim(job_id, "voiceover"):
+            raise HTTPException(409, "job is busy")
+        try:
+            result = await asyncio.to_thread(
+                add_voiceover_to_clip,
+                store,
+                job,
+                clip_id,
+                request.text,
+                voice=request.voice,
+            )
+            job = store.load(job_id)
+            await publish(job)
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from None
+        except Exception as exc:  # noqa: BLE001 - surface the real reason
+            raise HTTPException(500, f"voiceover failed: {exc}") from exc
+        finally:
+            app.state.busy.pop(job_id, None)
+        return {**result, "job": job.to_dict()}
 
     # -- JianYing draft export ---------------------------------------------
     @app.get("/api/jobs/{job_id}/export/draft")

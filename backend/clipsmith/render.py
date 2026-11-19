@@ -63,6 +63,10 @@ def render_selected(
             )
             clip.file = f"clips/{clip.id}.mp4"
             clip.status = "ready"
+            # A fresh render has no narration: drop the snapshot the voiceover
+            # mixer would otherwise reuse, and stop advertising old narration.
+            store.base_clip_path(job.id, clip.id).unlink(missing_ok=True)
+            clip.voiceover_text = ""
         except (MediaError, OSError) as exc:  # noqa: BLE001 - per-clip failure
             clip.status = "error"
             clip.error = str(exc)[:500]

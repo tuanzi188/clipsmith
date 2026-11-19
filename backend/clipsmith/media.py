@@ -136,6 +136,43 @@ def extract_wav(src: str | Path, dst: str | Path, sample_rate: int = 16000) -> P
     return dst
 
 
+def extract_audio(
+    src: str | Path,
+    dst: str | Path,
+    *,
+    sample_rate: int = 16000,
+    bitrate: str = "48k",
+) -> Path:
+    """Mono 16 kHz compressed audio, sized for cloud ASR upload limits.
+
+    48 kbps keeps a 10 minute clip near 3.6 MB, well under the usual 25 MB
+    request cap. The container is inferred from the destination extension.
+    """
+    ffmpeg = _require("ffmpeg")
+    dst = Path(dst)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    _run(
+        [
+            ffmpeg,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            str(src),
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            str(sample_rate),
+            "-b:a",
+            bitrate,
+            str(dst),
+        ]
+    )
+    return dst
+
+
 def detect_silences(
     src: str | Path,
     *,

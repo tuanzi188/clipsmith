@@ -31,6 +31,7 @@ FastAPI ──┬── jobs/      每个任务一个目录，纯文件存储
 - "换成 1:1" → `set_export_options`
 - "人别裁掉，用模糊背景" → `set_export_options {fit: blur}`
 - "出终版画质" → `set_export_options {quality: final}` 后重渲染
+- "给这条配段旁白" → `add_voiceover`（Edge-TTS 生成，原声压低，不替换原声）
 - "导出剪映草稿" → `export_draft`
 - "删掉第一条" → `delete_clips`（明确要求才执行）
 
@@ -69,6 +70,7 @@ FastAPI ──┬── jobs/      每个任务一个目录，纯文件存储
 - **AI 文案**：每条片段生成标题、发布文案和标签，一键复制
 - **自定义选段要求**：给 LLM 追加指令，例如"只挑有争议的观点，每条 20 秒内"
 - **烧字幕导出**：ASS 字幕按输出分辨率排版（字号/边距按画面高度比例），在切段编码时一次烧入，不做二次压缩
+- **可选旁白轨**：Edge-TTS 免费生成 1–2 句解说，叠在原声上并把原声压到 35%，视频流不重编；重复添加会替换上一条旁白，不会叠加（`pip install -e ".[tts]"`）
 - **交付级处理**：两遍 EBU R128 响度归一（视频流直通不重编）、切点 8ms 防爆音、48 kHz / 192 kbps 音频
 - **画质档位**：草稿 / 标准 / 终版（CRF 23/20/17，veryfast/medium/slow），对话或 UI 都能切
 - **剪映草稿导出**：生成能在剪映里继续编辑的工程（视频轨 + 字幕轨）
@@ -113,6 +115,17 @@ export CLIPSMITH_WHISPER_DEVICE=cpu     # 有 CUDA 可填 cuda
 export CLIPSMITH_WHISPER_COMPUTE=int8   # GPU 可填 float16
 ```
 
+也可以走云端，接任意 **OpenAI 兼容且返回 `verbose_json` 分段**的 `/v1/audio/transcriptions`（例如 Groq 的免费层）：
+
+```bash
+export CLIPSMITH_ENGINE=openai-asr
+export CLIPSMITH_CLOUD_ASR_BASE_URL=https://api.groq.com/openai/v1
+export CLIPSMITH_CLOUD_ASR_API_KEY=gsk_...
+export CLIPSMITH_CLOUD_ASR_MODEL=whisper-large-v3
+```
+
+> 只返回整段 `text`、没有 segment 时间戳的服务（例如硅基流动的 SenseVoice 接口）不能用于按句剪辑，本项目会明确报错，不会静默降级成文本。
+
 想用 FunASR（中文识别和标点更稳，但要装 torch）：
 
 ```bash
@@ -139,6 +152,7 @@ export CLIPSMITH_FUNCLIP_PATH=vendor/FunClip
 |---|---|---|
 | `mock` | 无 | 开发 UI、跑测试、演示（文本与音频不对应） |
 | `whisper` | faster-whisper | 本地真实转写，安装最轻，CPU 可用 |
+| `openai-asr` | OpenAI 兼容云接口 | 不想装模型；需 key，且服务要返回 verbose_json 分段 |
 | `funasr` | funasr + torch | 本地真实转写，中文标点/断句更稳 |
 | `funclip` | FunClip 全量依赖 | 已装好 FunClip、需要它的说话人分离 |
 
@@ -187,6 +201,7 @@ CLIPSMITH_LLM_TIMEOUT=180
 | GET | `/api/jobs/{id}/chat` | 对话历史 + 是否在执行 |
 | PATCH | `/api/jobs/{id}/options` | 更新画幅 / 适配方式 / 字幕 / 去停顿 / 画质 |
 | POST | `/api/jobs/{id}/render` | 导出：`{clip_ids?, aspect?, fit?: crop\|blur, quality?: draft\|standard\|final, subtitles?}`，不传 clip_ids 则导出全部待导出片段 |
+| POST | `/api/jobs/{id}/clips/{clip_id}/voiceover` | 加旁白：`{text, voice?}`；Edge-TTS 合成，原声压低，不替换原声 |
 | GET | `/api/jobs/{id}/media` | 原始素材（支持 Range，可拖动进度条） |
 | GET | `/api/jobs/{id}/clips/{clip_id}/file` | 渲染结果 |
 | GET | `/api/jobs/{id}/transcript.srt` | 整篇转写稿 SRT |
@@ -201,7 +216,9 @@ data/jobs/<job_id>/
 ├── job.json          # 任务状态、转写稿、片段列表
 ├── source.mp4
 ├── audio.wav         # 转写用，16k mono
-└── clips/<id>.mp4
+└── clips/
+    ├── <id>.mp4      # 成片（加过旁白的就是混好的版本）
+    └── <id>.base.mp4 # 无旁白的干净版，仅在加旁白后存在
 ```
 
 ## 导出剪映草稿

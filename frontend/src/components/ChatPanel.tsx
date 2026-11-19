@@ -7,7 +7,7 @@ interface Props {
   job: Job;
 }
 
-const QUICK = ["再短一点", "去掉停顿", "加字幕", "换成竖屏", "模糊背景", "终版画质", "导出成片"];
+const QUICK = ["再短一点", "去掉停顿", "加字幕", "换成竖屏", "模糊背景", "终版画质", "配段旁白", "导出成片"];
 
 export function ChatPanel({ job }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);

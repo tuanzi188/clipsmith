@@ -56,6 +56,7 @@ export interface Clip {
   ranges: number[][];
   removed_pauses: number;
   removed_seconds: number;
+  voiceover_text: string;
 }
 
 export interface Job {
